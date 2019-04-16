@@ -222,18 +222,19 @@ function swpm_do_getresponse_signup( $args ) {
     $target_list_name		 = $gr_list_name;
     $list_filter			 = array();
     $list_filter[ 'list_name' ]	 = $target_list_name;
-    $args				 = array( 'count' => 100, 'offset' => 0 ); //By default MC API v3.0 returns 10 lits only.
-    $all_lists			 = $api->get( 'lists', $args );
-    $lists_data			 = $all_lists[ 'lists' ];
+//    $args				 = array( 'count' => 100, 'offset' => 0 ); //By default MC API v3.0 returns 10 lits only.
+    $all_lists			 = $api->getCampaings();
+
+//    $lists_data			 = $all_lists[ 'lists' ];
     $found_match			 = false;
-    foreach ( $lists_data as $list ) {
-	SwpmLog::log_simple_debug( "[GetResponse] Checking list name : " . $list[ 'name' ], true );
-	if ( strtolower( $list[ 'name' ] ) == strtolower( $target_list_name ) ) {
-	    $found_match	 = true;
-	    $list_id	 = $list[ 'id' ];
-	    SwpmLog::log_simple_debug( "[GetResponse] Found a match for the list name on GetResponse. List ID :" . $list_id, true );
-	    break;
-	}
+    foreach ( $all_lists as $list ) {
+        SwpmLog::log_simple_debug( "[GetResponse] Checking list name : " . $list[ 'name' ], true );
+        if ( strtolower( $list[ 'name' ] ) === strtolower( $target_list_name ) ) {
+            $found_match = true;
+            $list_id = $list->campaignId;
+            SwpmLog::log_simple_debug( "[GetResponse] Found a match for the list name on GetResponse. List ID :" . $list_id, true );
+            break;
+        }
     }
     if ( ! $found_match ) {
 	SwpmLog::log_simple_debug( "[GetResponse] Could not find a list name in your GetResponse account that matches with the target list name: " . $target_list_name, false );
@@ -242,44 +243,44 @@ function swpm_do_getresponse_signup( $args ) {
     SwpmLog::log_simple_debug( "[GetResponse] List ID to subscribe to:" . $list_id, true );
 
     //If interest groups data is present then prepare the $interests array so it can be used in the API call.
-    if ( isset( $interest_group_names ) ) {
-	//get categories first
-	SwpmLog::log_simple_debug( "[GetResponse] Getting interest categories...", true );
-	$retval = $api->get( "lists/" . $list_id . "/interest-categories/" );
-	if ( ! $api->success() ) {
-	    SwpmLog::log_simple_debug( "[GetResponse] Unable to get interest categories.", false );
-	    SwpmLog::log_simple_debug( "\tError=" . $api->getLastError(), false );
-	    return false;
-	}
-	$categories	 = $retval[ 'categories' ];
-	//get groups for each category
-	$groups		 = array();
-	SwpmLog::log_simple_debug( "[GetResponse] Getting interest groups...", true );
-	foreach ( $categories as $category ) {
-	    $retval = $api->get( "lists/" . $list_id . "/interest-categories/" . $category[ 'id' ] . "/interests/" );
-	    if ( ! $api->success() ) {
-		SwpmLog::log_simple_debug( "[GetResponse] Unable to get interest groups.", false );
-		SwpmLog::log_simple_debug( "\tError=" . $api->getLastError(), false );
-		return false;
-	    }
-	    foreach ( $retval[ 'interests' ] as $group ) {
-		unset( $group[ '_links' ] ); // we don't need that
-		// might be a good idea to store this data in the settings, in order to lower number of requests to API upon signup?
-		$groups[] = $group;
-	    }
-	}
-	$interests = array();
-	//let's compare interest groups provided by user and get their IDs on match
-	foreach ( $interest_group_names as $interest_group_name ) {
-	    $interest_group_name = trim( $interest_group_name );
-	    foreach ( $groups as $group ) {
-		if ( $group[ 'name' ] == $interest_group_name ) {
-		    //name matches, let's add it to interests array
-		    $interests[ $group[ 'id' ] ] = true;
-		}
-	    }
-	}
-    }
+//    if ( isset( $interest_group_names ) ) {
+//	//get categories first
+//	SwpmLog::log_simple_debug( "[GetResponse] Getting interest categories...", true );
+//	$retval = $api->get( "lists/" . $list_id . "/interest-categories/" );
+//	if ( ! $api->success() ) {
+//	    SwpmLog::log_simple_debug( "[GetResponse] Unable to get interest categories.", false );
+//	    SwpmLog::log_simple_debug( "\tError=" . $api->getLastError(), false );
+//	    return false;
+//	}
+//	$categories	 = $retval[ 'categories' ];
+//	//get groups for each category
+//	$groups		 = array();
+//	SwpmLog::log_simple_debug( "[GetResponse] Getting interest groups...", true );
+//	foreach ( $categories as $category ) {
+//	    $retval = $api->get( "lists/" . $list_id . "/interest-categories/" . $category[ 'id' ] . "/interests/" );
+//	    if ( ! $api->success() ) {
+//		SwpmLog::log_simple_debug( "[GetResponse] Unable to get interest groups.", false );
+//		SwpmLog::log_simple_debug( "\tError=" . $api->getLastError(), false );
+//		return false;
+//	    }
+//	    foreach ( $retval[ 'interests' ] as $group ) {
+//		unset( $group[ '_links' ] ); // we don't need that
+//		// might be a good idea to store this data in the settings, in order to lower number of requests to API upon signup?
+//		$groups[] = $group;
+//	    }
+//	}
+//	$interests = array();
+//	//let's compare interest groups provided by user and get their IDs on match
+//	foreach ( $interest_group_names as $interest_group_name ) {
+//	    $interest_group_name = trim( $interest_group_name );
+//	    foreach ( $groups as $group ) {
+//		if ( $group[ 'name' ] == $interest_group_name ) {
+//		    //name matches, let's add it to interests array
+//		    $interests[ $group[ 'id' ] ] = true;
+//		}
+//	    }
+//	}
+//    }
 
     //Enable double opt-in is controlled by status field. Set it to "pending" for double opt-in.
     $status = 'subscribed'; //Don't use double opt-in
@@ -289,45 +290,51 @@ function swpm_do_getresponse_signup( $args ) {
     }
     
     //Create the merge_vars data
-    $merge_vars = array( 'FNAME' => $first_name, 'LNAME' => $last_name, 'INTERESTS' => '' );
+//    $merge_vars = array( 'FNAME' => $first_name, 'LNAME' => $last_name, 'INTERESTS' => '' );
+//
+//    $api_arr = array( 'email_address' => $email, 'status_if_new' => $status, 'status' => $status, 'merge_fields' => $merge_vars );
+//    if ( isset( $interests ) ) {
+//	$api_arr[ 'interests' ] = $interests;
+//    }
+//
+//    $member_hash = md5( strtolower( $email ) ); //The MD5 hash of the lowercase version of the list member’s email address.
+//
+////    $retval = $api->put( "lists/" . $list_id . "/members/" . $member_hash, $api_arr );
 
-    $api_arr = array( 'email_address' => $email, 'status_if_new' => $status, 'status' => $status, 'merge_fields' => $merge_vars );
-    if ( isset( $interests ) ) {
-	$api_arr[ 'interests' ] = $interests;
-    }
+//    if ( ! $api->success() ) {
+//	SwpmLog::log_simple_debug( "[GetResponse] Unable to subscribe.", false );
+//	SwpmLog::log_simple_debug( "\tError=" . $api->getLastError(), false );
+//	return false;
+//    }
 
-    $member_hash = md5( strtolower( $email ) ); //The MD5 hash of the lowercase version of the list member’s email address.
-
-    $retval = $api->put( "lists/" . $list_id . "/members/" . $member_hash, $api_arr );
-
-    if ( ! $api->success() ) {
-	SwpmLog::log_simple_debug( "[GetResponse] Unable to subscribe.", false );
-	SwpmLog::log_simple_debug( "\tError=" . $api->getLastError(), false );
-	return false;
-    }
+    $api->addContact([
+        'name' => $first_name . " " . $last_name,
+        'email' => $email,
+        'campaign' => array('campaignId' => $list_id),
+    ]);
 
     // let's check if member level was changed
-    if ( isset( $member_info[ 'prev_membership_level' ] ) && $member_info[ 'prev_membership_level' ] !== false ) {
-	if ( $member_info[ 'prev_membership_level' ] !== $member_info[ 'membership_level' ] ) {
+//    if ( isset( $member_info[ 'prev_membership_level' ] ) && $member_info[ 'prev_membership_level' ] !== false ) {
+//	if ( $member_info[ 'prev_membership_level' ] !== $member_info[ 'membership_level' ] ) {
 	    //it has. Now let's check if interests are matching those set for current level
-	    if ( $retval[ 'interests' ] != $interests ) {
-		//no match. Let's swtich off interests that aren't in this group
-		foreach ( $retval[ 'interests' ] as $key => $value ) {
-		    $retval[ 'interests' ][ $key ] = false;
-		}
-		SwpmLog::log_simple_debug( "[GetResponse] Modifying interest groups...", true );
-
-		$api_arr[ 'interests' ]	 = $interests + $retval[ 'interests' ];
-		$retval			 = $api->put( "lists/" . $list_id . "/members/" . $member_hash, $api_arr );
-
-		if ( ! $api->success() ) {
-		    SwpmLog::log_simple_debug( "[GetResponse] Unable to modify interest groups.", false );
-		    SwpmLog::log_simple_debug( "\tError=" . $api->getLastError(), false );
-		    return false;
-		}
-	    }
-	}
-    }
+//	    if ( $retval[ 'interests' ] != $interests ) {
+//		//no match. Let's swtich off interests that aren't in this group
+//		foreach ( $retval[ 'interests' ] as $key => $value ) {
+//		    $retval[ 'interests' ][ $key ] = false;
+//		}
+//		SwpmLog::log_simple_debug( "[GetResponse] Modifying interest groups...", true );
+//
+//		$api_arr[ 'interests' ]	 = $interests + $retval[ 'interests' ];
+//		$retval			 = $api->put( "lists/" . $list_id . "/members/" . $member_hash, $api_arr );
+//
+//		if ( ! $api->success() ) {
+//		    SwpmLog::log_simple_debug( "[GetResponse] Unable to modify interest groups.", false );
+//		    SwpmLog::log_simple_debug( "\tError=" . $api->getLastError(), false );
+//		    return false;
+//		}
+//	    }
+//	}
+//    }
 
     SwpmLog::log_simple_debug( "[GetResponse] GetResponse Signup was successful.", true );
 }
