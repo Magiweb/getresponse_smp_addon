@@ -184,6 +184,7 @@ function swpm_do_getresponse_signup( $args ) {
     $key = 'swpm_getresponse_list_name';
     $gr_list_name = SwpmMembershipLevelCustom::get_value_by_key( $level_id, $key );
 
+//    var_dump($level_id, $key, $gr_list_name); exit;
     SwpmLog::log_simple_debug( "[GetResponse] Debug data: " . $gr_list_name . "|" . $email . "|" . $first_name . "|" . $last_name, true );
 
     if ( empty( $gr_list_name ) ) {//This level has no getresponse list name specified for it
@@ -196,6 +197,8 @@ function swpm_do_getresponse_signup( $args ) {
 
     $swpm_gr_settings = get_option( 'swpm_getresponse_settings' );
     $api_key = $swpm_gr_settings[ 'gr_api_key' ];
+//    var_dump($level_id, $key, $gr_list_name, $api_key); exit;
+
     if ( empty( $api_key ) ) {
 	SwpmLog::log_simple_debug( "[GetResponse] GetResponse API Key value is not saved in the settings. Go to GetResponse settings and enter the API Key.", false );
 	return;
@@ -223,13 +226,14 @@ function swpm_do_getresponse_signup( $args ) {
     $list_filter			 = array();
     $list_filter[ 'list_name' ]	 = $target_list_name;
 //    $args				 = array( 'count' => 100, 'offset' => 0 ); //By default MC API v3.0 returns 10 lits only.
-    $all_lists			 = $api->getCampaings();
+    $all_lists			 = $api->getCampaigns();
+//    var_dump($all_lists); exit;
 
 //    $lists_data			 = $all_lists[ 'lists' ];
     $found_match			 = false;
     foreach ( $all_lists as $list ) {
-        SwpmLog::log_simple_debug( "[GetResponse] Checking list name : " . $list[ 'name' ], true );
-        if ( strtolower( $list[ 'name' ] ) === strtolower( $target_list_name ) ) {
+        SwpmLog::log_simple_debug( "[GetResponse] Checking list name : " . $list->name, true );
+        if ( strtolower( $list->name ) === strtolower( $target_list_name ) ) {
             $found_match = true;
             $list_id = $list->campaignId;
             SwpmLog::log_simple_debug( "[GetResponse] Found a match for the list name on GetResponse. List ID :" . $list_id, true );
@@ -283,11 +287,11 @@ function swpm_do_getresponse_signup( $args ) {
 //    }
 
     //Enable double opt-in is controlled by status field. Set it to "pending" for double opt-in.
-    $status = 'subscribed'; //Don't use double opt-in
-    if (! empty ($swpm_gr_settings[ 'gr_enable_double_optin' ])) {
-        $status = 'pending'; //Use double opt-in
-        SwpmLog::log_simple_debug( "[GetResponse] Double opt-in is enabled. Setting status to: ".$status, true );
-    }
+//    $status = 'subscribed'; //Don't use double opt-in
+//    if (! empty ($swpm_gr_settings[ 'gr_enable_double_optin' ])) {
+//        $status = 'pending'; //Use double opt-in
+//        SwpmLog::log_simple_debug( "[GetResponse] Double opt-in is enabled. Setting status to: ".$status, true );
+//    }
     
     //Create the merge_vars data
 //    $merge_vars = array( 'FNAME' => $first_name, 'LNAME' => $last_name, 'INTERESTS' => '' );
@@ -307,12 +311,13 @@ function swpm_do_getresponse_signup( $args ) {
 //	return false;
 //    }
 
-    $api->addContact([
+    $result = $api->addContact([
         'name' => $first_name . " " . $last_name,
         'email' => $email,
         'campaign' => array('campaignId' => $list_id),
     ]);
 
+//    var_dump($result); exit;
     // let's check if member level was changed
 //    if ( isset( $member_info[ 'prev_membership_level' ] ) && $member_info[ 'prev_membership_level' ] !== false ) {
 //	if ( $member_info[ 'prev_membership_level' ] !== $member_info[ 'membership_level' ] ) {
